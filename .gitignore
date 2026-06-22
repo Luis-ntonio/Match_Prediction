@@ -2,6 +2,7 @@
 __pycache__/
 *.pyc
 *.log
+.claude
 
 # Regenerable intermediate data and heavy model artifacts (run src/ scripts to rebuild)
 data/processed/
