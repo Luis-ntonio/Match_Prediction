@@ -6,6 +6,7 @@ shuffling future matches into training.
 import json
 from pathlib import Path
 
+import joblib
 import numpy as np
 import pandas as pd
 from sklearn.metrics import accuracy_score, brier_score_loss, log_loss, mean_poisson_deviance
@@ -186,6 +187,10 @@ def main():
     clf.save_model(MODELS_DIR / "xgb_1x2.json")
     reg_home.save_model(MODELS_DIR / "xgb_home_goals.json")
     reg_away.save_model(MODELS_DIR / "xgb_away_goals.json")
+    joblib.dump(
+        {"result_encoder": result_encoder, "categorical_encoders": encoders},
+        MODELS_DIR / "encoders.joblib",
+    )
 
     report = {
         "result_classes": list(result_encoder.classes_),
