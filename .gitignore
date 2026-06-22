@@ -1,0 +1,8 @@
+.venv/
+__pycache__/
+*.pyc
+*.log
+
+# Regenerable intermediate data and heavy model artifacts (run src/ scripts to rebuild)
+data/processed/
+models/mcmc_idata.nc

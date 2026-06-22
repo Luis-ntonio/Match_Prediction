@@ -1,3 +1,64 @@
+## ML Pipeline: MCMC + XGBoost Match Prediction
+
+This fork adds a prediction pipeline on top of the dataset below. It predicts
+1X2 outcomes (home win / draw / away win) and expected goals for each team,
+using matches from 2015 onward.
+
+### Approach
+
+1. **Data cleaning** (`src/data_cleaning.py`) — filters to 2015+, normalizes
+   historical team names to their current name (via `former_names.csv`),
+   drops unplayed/future fixtures, dedupes.
+2. **Feature engineering** (`src/features.py`) — for every match, computes
+   only pre-match (leakage-safe) features: a simple Elo rating (with a
+   margin-of-victory boost), rolling form (last 5/10 matches: goals for/against,
+   points), rest days, head-to-head history, and tournament tier.
+3. **MCMC ratings** (`src/mcmc_model.py`) — a hierarchical Bayesian model
+   (PyMC/NUTS) in the spirit of Dixon-Coles: each team has an attack and
+   defense strength per season, evolving as a random walk, with goals modeled
+   as Poisson(attack − opponent defense + home advantage). Sampled via NUTS.
+   To avoid leakage, a match in season *S* only ever sees the posterior
+   rating estimated as of the end of season *S − 1* (`src/merge_mcmc_features.py`).
+4. **XGBoost models** (`src/train_xgboost.py`) — a multiclass classifier for
+   1X2 (`multi:softprob`) and two Poisson regressors for home/away expected
+   goals, trained on a strictly temporal train/val/test split (no shuffling
+   across time).
+5. **Evaluation** (`src/evaluate.py`) — compares XGBoost against a
+   majority-class baseline and an Elo-only baseline, plus a season-by-season
+   walk-forward backtest.
+
+### Results (test split, matches from 2024-10 to 2026-06)
+
+| Model | Accuracy | Log loss |
+|---|---|---|
+| Majority-class baseline | 0.480 | 1.050 |
+| Elo-only baseline | 0.584 | 0.903 |
+| **XGBoost (MCMC + Elo + form features)** | **0.613** | **0.812** |
+
+Walk-forward backtest accuracy stays in the 0.52–0.65 range across seasons
+2016–2026 with no degenerate failures — see `reports/walk_forward_backtest.csv`.
+
+### Running it
+
+```bash
+python -m venv .venv && source .venv/Scripts/activate  # or .venv/bin/activate on Linux/Mac
+pip install -r requirements.txt
+
+python src/data_cleaning.py
+python src/features.py
+python src/mcmc_model.py          # fits the MCMC model, ~1 min on this dataset size
+python src/merge_mcmc_features.py
+python src/train_xgboost.py       # trains + saves models/xgb_*.json
+python src/evaluate.py            # baselines + walk-forward backtest
+```
+
+Trained XGBoost models are saved in `models/`; the full MCMC posterior
+(`models/mcmc_idata.nc`, ~260MB) is gitignored — rerun `src/mcmc_model.py` to
+regenerate it. Intermediate parquet files in `data/processed/` are also
+gitignored and rebuilt by the scripts above.
+
+---
+
 ### Context
 
 Well, what happened was that I was looking for a semi-definitive easy-to-read list of international football matches and couldn't find anything decent. So I took it upon myself to collect it for my own use. I might as well share it.

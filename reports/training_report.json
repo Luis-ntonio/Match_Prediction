@@ -1,0 +1,81 @@
+{
+  "result_classes": [
+    "away_win",
+    "draw",
+    "home_win"
+  ],
+  "feature_cols": [
+    "elo_diff",
+    "elo_home_pre",
+    "elo_away_pre",
+    "h2h_matches",
+    "h2h_home_win_rate",
+    "home_form_goals_for_5",
+    "home_form_goals_against_5",
+    "home_form_points_5",
+    "away_form_goals_for_5",
+    "away_form_goals_against_5",
+    "away_form_points_5",
+    "home_form_goals_for_10",
+    "home_form_goals_against_10",
+    "home_form_points_10",
+    "away_form_goals_for_10",
+    "away_form_goals_against_10",
+    "away_form_points_10",
+    "form_points_diff_5",
+    "form_goal_diff_5",
+    "home_rest_days",
+    "away_rest_days",
+    "rest_days_diff",
+    "home_matches_played",
+    "away_matches_played",
+    "home_mcmc_attack_mean",
+    "home_mcmc_attack_sd",
+    "home_mcmc_defense_mean",
+    "home_mcmc_defense_sd",
+    "away_mcmc_attack_mean",
+    "away_mcmc_attack_sd",
+    "away_mcmc_defense_mean",
+    "away_mcmc_defense_sd",
+    "mcmc_attack_diff",
+    "mcmc_defense_diff",
+    "mcmc_net_strength_home",
+    "mcmc_net_strength_away",
+    "neutral"
+  ],
+  "categorical_cols": [
+    "tournament_tier"
+  ],
+  "outcome_metrics": {
+    "val": {
+      "accuracy": 0.6208384710234278,
+      "log_loss": 0.8250131607055664,
+      "brier_score": 0.16116717954476675
+    },
+    "test": {
+      "accuracy": 0.6134401972872996,
+      "log_loss": 0.8124788999557495,
+      "brier_score": 0.15865018963813782
+    }
+  },
+  "home_goals_metrics": {
+    "val": {
+      "poisson_deviance": 1.0353827476501465,
+      "mae": 0.9286046163552198
+    },
+    "test": {
+      "poisson_deviance": 1.0753203630447388,
+      "mae": 0.9758048194992263
+    }
+  },
+  "away_goals_metrics": {
+    "val": {
+      "poisson_deviance": 1.019150733947754,
+      "mae": 0.7892711291275689
+    },
+    "test": {
+      "poisson_deviance": 1.0757826566696167,
+      "mae": 0.8110786748340333
+    }
+  }
+}
