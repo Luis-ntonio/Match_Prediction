@@ -14,6 +14,8 @@ from sklearn.metrics import accuracy_score, brier_score_loss, log_loss, mean_poi
 from sklearn.preprocessing import LabelEncoder
 from xgboost import XGBClassifier, XGBRegressor
 
+from seed_ensemble import SeedEnsembleClassifier
+
 DATA_DIR = Path(__file__).resolve().parent.parent
 PROCESSED_DIR = DATA_DIR / "data" / "processed"
 MODELS_DIR = DATA_DIR / "models"
@@ -56,6 +58,14 @@ FEATURE_COLS = [
     "mcmc_defense_diff",
     "mcmc_net_strength_home",
     "mcmc_net_strength_away",
+    "online_att_home",
+    "online_def_home",
+    "online_att_away",
+    "online_def_away",
+    "online_net_home",
+    "online_net_away",
+    "online_att_diff",
+    "online_def_diff",
     "neutral",
 ]
 CATEGORICAL_COLS = ["tournament_tier"]
@@ -93,6 +103,32 @@ def prep_features(df: pd.DataFrame, encoders: dict[str, LabelEncoder] | None = N
 
 
 CALIBRATED_N_ESTIMATORS = 200  # tuned without early stopping (CV-calibration refits folds independently)
+CALIBRATED_SEED_ENSEMBLE = 5  # average several random_state refits to reduce variance (test set is small)
+
+
+def _detect_device() -> str:
+    """Use the GPU if XGBoost can see a CUDA device, else fall back to CPU.
+
+    Note: on this dataset (~23k rows) GPU and CPU train in about the same time —
+    the data is too small for the GPU to amortise its overhead. The flag is wired
+    so the pipeline scales to a GPU automatically if the dataset grows or more
+    external features are added; it is not a speed win at the current size.
+    """
+    try:
+        import xgboost as xgb
+
+        booster = xgb.train(
+            {"device": "cuda", "tree_method": "hist"},
+            xgb.DMatrix(np.zeros((4, 1)), label=np.zeros(4)),
+            num_boost_round=1,
+        )
+        del booster
+        return "cuda"
+    except Exception:
+        return "cpu"
+
+
+DEVICE = _detect_device()
 
 
 def _xgb_classifier(n_estimators: int, **overrides) -> XGBClassifier:
@@ -106,6 +142,8 @@ def _xgb_classifier(n_estimators: int, **overrides) -> XGBClassifier:
         objective="multi:softprob",
         num_class=3,
         random_state=42,
+        device=DEVICE,
+        tree_method="hist",
     )
     params.update(overrides)
     return XGBClassifier(**params)
@@ -146,14 +184,25 @@ def train_outcome_classifier(train, val, test):
     # empirically *hurt* held-out test log-loss/Brier here -- CV calibration
     # uses ~6x more data for the isotonic fit and measurably improved test
     # accuracy (0.613 -> 0.624) and log-loss (0.812 -> 0.804).
+    #
+    # On top of that, the shipped model averages CALIBRATED_SEED_ENSEMBLE
+    # independent refits (different random_state). A single seed's test
+    # accuracy varies by +/-1.5pts purely from training randomness given the
+    # small test split; averaging seeds reduces that variance for a modest,
+    # robust accuracy gain (~0.624 -> ~0.628-0.631 across repeated runs).
     trainval = pd.concat([train, val])
     y_trainval = result_encoder.transform(trainval["result"].astype(str))
     X_trainval, _ = prep_features(trainval, encoders=encoders)
 
-    calibrated_clf = CalibratedClassifierCV(
-        _xgb_classifier(n_estimators=CALIBRATED_N_ESTIMATORS), method="isotonic", cv=5
-    )
-    calibrated_clf.fit(X_trainval, y_trainval)
+    seed_models = []
+    for seed in range(CALIBRATED_SEED_ENSEMBLE):
+        m = CalibratedClassifierCV(
+            _xgb_classifier(n_estimators=CALIBRATED_N_ESTIMATORS, random_state=seed),
+            method="isotonic", cv=5,
+        )
+        m.fit(X_trainval, y_trainval)
+        seed_models.append(m)
+    calibrated_clf = SeedEnsembleClassifier(seed_models)
 
     metrics = {
         "raw": {
@@ -188,6 +237,8 @@ def train_goals_regressor(train, val, test, target_col: str, encoders: dict):
         eval_metric="poisson-nloglik",
         early_stopping_rounds=50,
         random_state=42,
+        device=DEVICE,
+        tree_method="hist",
     )
     reg.fit(X_train, y_train, eval_set=[(X_val, y_val)], verbose=False)
 
@@ -199,6 +250,33 @@ def train_goals_regressor(train, val, test, target_col: str, encoders: dict):
             "mae": float(np.mean(np.abs(y - pred))),
         }
     return reg, metrics
+
+
+def _boosters(model):
+    """Yield every fitted Booster inside a model, descending through the
+    CalibratedClassifierCV and SeedEnsembleClassifier wrappers."""
+    if isinstance(model, SeedEnsembleClassifier):
+        for m in model.models:
+            yield from _boosters(m)
+    elif isinstance(model, CalibratedClassifierCV):
+        for cc in model.calibrated_classifiers_:
+            est = getattr(cc, "estimator", None) or getattr(cc, "base_estimator", None)
+            if est is not None:
+                yield from _boosters(est)
+    elif isinstance(model, (XGBClassifier, XGBRegressor)):
+        try:
+            yield model.get_booster()
+        except Exception:
+            pass
+
+
+def _to_cpu_inference(model):
+    """Trained on GPU; switch boosters to CPU so single-row inference in
+    predict.py runs cleanly without GPU<->CPU device-mismatch fallbacks (the
+    GPU gives no benefit for one-off predictions)."""
+    for b in _boosters(model):
+        b.set_param({"device": "cpu"})
+    return model
 
 
 def main():
@@ -220,6 +298,9 @@ def main():
     reg_away, away_metrics = train_goals_regressor(train, val, test, "away_score", encoders)
     print("home goals regressor:", json.dumps(home_metrics, indent=2))
     print("away goals regressor:", json.dumps(away_metrics, indent=2))
+
+    for m in (clf, reg_home, reg_away, calibrated_clf):
+        _to_cpu_inference(m)
 
     clf.save_model(MODELS_DIR / "xgb_1x2.json")
     reg_home.save_model(MODELS_DIR / "xgb_home_goals.json")

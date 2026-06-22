@@ -13,7 +13,7 @@ import numpy as np
 import pandas as pd
 from xgboost import XGBRegressor
 
-from features import add_elo, tournament_tier
+from features import add_elo, latest_online_rating, tournament_tier
 from train_xgboost import FEATURE_COLS
 
 DATA_DIR = Path(__file__).resolve().parent.parent
@@ -101,7 +101,7 @@ def head_to_head_stats(results: pd.DataFrame, home_team: str, away_team: str) ->
 
 def build_feature_row(
     home_team: str, away_team: str, tournament: str, neutral: bool,
-    results: pd.DataFrame, ratings: pd.DataFrame, elo: dict,
+    results: pd.DataFrame, ratings: pd.DataFrame, elo: dict, online: dict,
 ) -> pd.DataFrame:
     home_form5 = latest_team_form(results, home_team, 5)
     home_form10 = latest_team_form(results, home_team, 10)
@@ -114,6 +114,10 @@ def build_feature_row(
 
     elo_home = elo.get(home_team, 1500.0)
     elo_away = elo.get(away_team, 1500.0)
+
+    on_att = online["att"]; on_def = online["def"]
+    on_att_h = on_att.get(home_team, 0.0); on_def_h = on_def.get(home_team, 0.0)
+    on_att_a = on_att.get(away_team, 0.0); on_def_a = on_def.get(away_team, 0.0)
 
     row = {
         "elo_diff": elo_home - elo_away,
@@ -153,6 +157,14 @@ def build_feature_row(
         "mcmc_defense_diff": home_mcmc["defense_mean"] - away_mcmc["defense_mean"],
         "mcmc_net_strength_home": home_mcmc["attack_mean"] - away_mcmc["defense_mean"],
         "mcmc_net_strength_away": away_mcmc["attack_mean"] - home_mcmc["defense_mean"],
+        "online_att_home": on_att_h,
+        "online_def_home": on_def_h,
+        "online_att_away": on_att_a,
+        "online_def_away": on_def_a,
+        "online_net_home": on_att_h - on_def_a,
+        "online_net_away": on_att_a - on_def_h,
+        "online_att_diff": on_att_h - on_att_a,
+        "online_def_diff": on_def_h - on_def_a,
         "neutral": int(neutral),
         "tournament_tier": tournament_tier(tournament),
     }
@@ -163,12 +175,13 @@ def predict_match(home_team: str, away_team: str, tournament: str = "Friendly", 
     results = pd.read_parquet(PROCESSED_DIR / "results_clean.parquet")
     ratings = pd.read_parquet(PROCESSED_DIR / "mcmc_ratings.parquet")
     elo = latest_elo(results)
+    online = latest_online_rating(results)
 
     calibrated_clf, reg_home, reg_away, encoders = load_models()
     result_encoder = encoders["result_encoder"]
     tier_encoder = encoders["categorical_encoders"]["tournament_tier"]
 
-    row = build_feature_row(home_team, away_team, tournament, neutral, results, ratings, elo)
+    row = build_feature_row(home_team, away_team, tournament, neutral, results, ratings, elo, online)
 
     tier_value = row["tournament_tier"].iloc[0]
     if tier_value not in set(tier_encoder.classes_):

@@ -124,6 +124,86 @@ def add_elo(results: pd.DataFrame) -> pd.DataFrame:
     return results
 
 
+ONLINE_LR = 0.02
+ONLINE_MU = 0.2
+ONLINE_HOME_ADV = 0.25
+
+
+def _run_online_poisson(results, lr, mu, home_adv):
+    """Single chronological pass of the online Poisson attack/defense updates.
+
+    Returns the per-match pre-match state array plus the final att/def dicts
+    (state after every match has been seen) so both the feature builder and
+    live inference can share one implementation.
+    """
+    ordered = results.sort_values(["date", "match_id"])
+    h = ordered["home_team"].to_numpy()
+    a = ordered["away_team"].to_numpy()
+    hs = ordered["home_score"].to_numpy().astype(float)
+    as_ = ordered["away_score"].to_numpy().astype(float)
+    neutral = ordered["neutral"].to_numpy()
+
+    att: dict[str, float] = {}
+    dfn: dict[str, float] = {}
+    pre = np.zeros((len(ordered), 4))  # h_att, h_def, a_att, a_def (pre-match)
+
+    for i in range(len(ordered)):
+        ah = att.get(h[i], 0.0); dh = dfn.get(h[i], 0.0)
+        aa = att.get(a[i], 0.0); da = dfn.get(a[i], 0.0)
+        pre[i] = [ah, dh, aa, da]
+
+        ha = 0.0 if neutral[i] else home_adv
+        lam_h = np.exp(mu + ha + ah - da)
+        lam_a = np.exp(mu + aa - dh)
+        # gradient of Poisson NLL wrt each linear-predictor term = (lambda - goals)
+        g_h = lam_h - hs[i]
+        g_a = lam_a - as_[i]
+        att[h[i]] = ah - lr * g_h
+        dfn[a[i]] = da + lr * g_h
+        att[a[i]] = aa - lr * g_a
+        dfn[h[i]] = dh + lr * g_a
+
+    return pre, att, dfn, ordered["match_id"].to_numpy()
+
+
+def latest_online_rating(results, lr=ONLINE_LR, mu=ONLINE_MU, home_adv=ONLINE_HOME_ADV) -> dict:
+    """Final (post-all-matches) online att/def per team, for live inference."""
+    _, att, dfn, _ = _run_online_poisson(results, lr, mu, home_adv)
+    return {"att": att, "def": dfn}
+
+
+def add_online_poisson_rating(
+    results: pd.DataFrame, lr=ONLINE_LR, mu=ONLINE_MU, home_adv=ONLINE_HOME_ADV
+) -> pd.DataFrame:
+    """Online attack/defense ratings updated every match via one SGD step on the
+    Poisson NLL of the observed goals (log-rate = mu + home_adv + att - opp_def).
+
+    Unlike the seasonal MCMC ratings (which freeze a team's strength to the end
+    of the *previous* season and so can be up to a year stale), this rating is
+    always current: each match only ever sees the pre-match state, so it stays
+    leakage-safe while reacting to recent results. It complements MCMC — the
+    ablation showed ratings carry essentially all the signal, and a fresher
+    rating measurably improves probability calibration (log loss).
+    """
+    pre, _att, _dfn, match_ids = _run_online_poisson(results, lr, mu, home_adv)
+
+    out = pd.DataFrame(
+        {
+            "match_id": match_ids,
+            "online_att_home": pre[:, 0],
+            "online_def_home": pre[:, 1],
+            "online_att_away": pre[:, 2],
+            "online_def_away": pre[:, 3],
+        }
+    )
+    results = results.merge(out, on="match_id")
+    results["online_net_home"] = results["online_att_home"] - results["online_def_away"]
+    results["online_net_away"] = results["online_att_away"] - results["online_def_home"]
+    results["online_att_diff"] = results["online_att_home"] - results["online_att_away"]
+    results["online_def_diff"] = results["online_def_home"] - results["online_def_away"]
+    return results
+
+
 def add_head_to_head(results: pd.DataFrame) -> pd.DataFrame:
     results = results.sort_values(["date", "match_id"]).reset_index(drop=True)
     pair_key = results.apply(lambda r: tuple(sorted([r["home_team"], r["away_team"]])), axis=1)
@@ -157,6 +237,7 @@ def add_head_to_head(results: pd.DataFrame) -> pd.DataFrame:
 
 def build_match_features(results: pd.DataFrame) -> pd.DataFrame:
     results = add_elo(results)
+    results = add_online_poisson_rating(results)
     results = add_head_to_head(results)
     results["tournament_tier"] = results["tournament"].map(tournament_tier)
 

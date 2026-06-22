@@ -1,11 +1,11 @@
-"""Load and clean the international football results data, scoped to 2015 onward."""
+"""Load and clean the international football results data, scoped to 2002 onward."""
 from pathlib import Path
 
 import pandas as pd
 
 DATA_DIR = Path(__file__).resolve().parent.parent
 PROCESSED_DIR = DATA_DIR / "data" / "processed"
-START_DATE = "2015-01-01"
+START_DATE = "2002-01-01"
 
 
 def load_former_names() -> pd.DataFrame:

@@ -1,20 +1,20 @@
 {
   "xgboost_raw_test": {
-    "accuracy": 0.6134401972872996,
-    "log_loss": 0.8124788999557495,
-    "brier_score": 0.15865018963813782
+    "accuracy": 0.6213479895863465,
+    "log_loss": 0.8119679093360901,
+    "brier_score": 0.15871801475683847
   },
   "xgboost_calibrated_test": {
-    "accuracy": 0.623921085080148,
-    "log_loss": 0.8041916131640955,
-    "brier_score": 0.15757203340526474
+    "accuracy": 0.62105872143477,
+    "log_loss": 0.8076268833861654,
+    "brier_score": 0.15838456223643005
   },
   "majority_class_baseline_test": {
-    "accuracy": 0.4802712700369914,
-    "log_loss": 1.0500750113590207
+    "accuracy": 0.4729534278275962,
+    "log_loss": 1.0536123843173155
   },
   "elo_only_baseline_test": {
-    "accuracy": 0.5844636251541308,
-    "log_loss": 0.90319154893843
+    "accuracy": 0.5961816603991901,
+    "log_loss": 0.8948323368499995
   }
 }

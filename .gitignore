@@ -7,3 +7,6 @@ __pycache__/
 # Regenerable intermediate data and heavy model artifacts (run src/ scripts to rebuild)
 data/processed/
 models/mcmc_idata.nc
+
+# External datasets (own licensing, large; fetched ad hoc, not part of the repo)
+data/external/

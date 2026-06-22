@@ -41,6 +41,14 @@
     "mcmc_defense_diff",
     "mcmc_net_strength_home",
     "mcmc_net_strength_away",
+    "online_att_home",
+    "online_def_home",
+    "online_att_away",
+    "online_def_away",
+    "online_net_home",
+    "online_net_away",
+    "online_att_diff",
+    "online_def_diff",
     "neutral"
   ],
   "categorical_cols": [
@@ -49,42 +57,42 @@
   "outcome_metrics": {
     "raw": {
       "val": {
-        "accuracy": 0.6208384710234278,
-        "log_loss": 0.8250131607055664,
-        "brier_score": 0.16116717954476675
+        "accuracy": 0.6291582296789123,
+        "log_loss": 0.8187932968139648,
+        "brier_score": 0.1596994400024414
       },
       "test": {
-        "accuracy": 0.6134401972872996,
-        "log_loss": 0.8124788999557495,
-        "brier_score": 0.15865018963813782
+        "accuracy": 0.6213479895863465,
+        "log_loss": 0.8119679093360901,
+        "brier_score": 0.15871801475683847
       }
     },
     "calibrated": {
       "test": {
-        "accuracy": 0.623921085080148,
-        "log_loss": 0.8041916131640955,
-        "brier_score": 0.15757203340526474
+        "accuracy": 0.62105872143477,
+        "log_loss": 0.8076268833861654,
+        "brier_score": 0.15838456223643005
       }
     }
   },
   "home_goals_metrics": {
     "val": {
-      "poisson_deviance": 1.0353827476501465,
-      "mae": 0.9286046163552198
+      "poisson_deviance": 1.029266119003296,
+      "mae": 0.9311357087350354
     },
     "test": {
-      "poisson_deviance": 1.0753203630447388,
-      "mae": 0.9758048194992263
+      "poisson_deviance": 1.041337490081787,
+      "mae": 0.9416328216774946
     }
   },
   "away_goals_metrics": {
     "val": {
-      "poisson_deviance": 1.019150733947754,
-      "mae": 0.7892711291275689
+      "poisson_deviance": 1.0347685813903809,
+      "mae": 0.7761653694293215
     },
     "test": {
-      "poisson_deviance": 1.0757826566696167,
-      "mae": 0.8110786748340333
+      "poisson_deviance": 1.0316226482391357,
+      "mae": 0.7892278834254989
     }
   }
 }
