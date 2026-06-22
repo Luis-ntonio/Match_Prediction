@@ -11,7 +11,7 @@ from pathlib import Path
 import joblib
 import numpy as np
 import pandas as pd
-from xgboost import XGBClassifier, XGBRegressor
+from xgboost import XGBRegressor
 
 from features import add_elo, tournament_tier
 from train_xgboost import FEATURE_COLS
@@ -22,14 +22,13 @@ MODELS_DIR = DATA_DIR / "models"
 
 
 def load_models():
-    clf = XGBClassifier()
-    clf.load_model(MODELS_DIR / "xgb_1x2.json")
+    calibrated_clf = joblib.load(MODELS_DIR / "xgb_1x2_calibrated.joblib")
     reg_home = XGBRegressor()
     reg_home.load_model(MODELS_DIR / "xgb_home_goals.json")
     reg_away = XGBRegressor()
     reg_away.load_model(MODELS_DIR / "xgb_away_goals.json")
     encoders = joblib.load(MODELS_DIR / "encoders.joblib")
-    return clf, reg_home, reg_away, encoders
+    return calibrated_clf, reg_home, reg_away, encoders
 
 
 def latest_team_form(results: pd.DataFrame, team: str, window: int) -> dict:
@@ -165,7 +164,7 @@ def predict_match(home_team: str, away_team: str, tournament: str = "Friendly", 
     ratings = pd.read_parquet(PROCESSED_DIR / "mcmc_ratings.parquet")
     elo = latest_elo(results)
 
-    clf, reg_home, reg_away, encoders = load_models()
+    calibrated_clf, reg_home, reg_away, encoders = load_models()
     result_encoder = encoders["result_encoder"]
     tier_encoder = encoders["categorical_encoders"]["tournament_tier"]
 
@@ -179,7 +178,7 @@ def predict_match(home_team: str, away_team: str, tournament: str = "Friendly", 
     X = row[FEATURE_COLS + ["tournament_tier_enc"]].copy()
     X["neutral"] = X["neutral"].astype(int)
 
-    proba = clf.predict_proba(X)[0]
+    proba = calibrated_clf.predict_proba(X)[0]
     classes = list(result_encoder.classes_)
 
     exp_home_goals = float(reg_home.predict(X)[0])

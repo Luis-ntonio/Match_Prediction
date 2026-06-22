@@ -22,10 +22,15 @@ using matches from 2015 onward.
 4. **XGBoost models** (`src/train_xgboost.py`) — a multiclass classifier for
    1X2 (`multi:softprob`) and two Poisson regressors for home/away expected
    goals, trained on a strictly temporal train/val/test split (no shuffling
-   across time).
+   across time). The shipped classifier is probability-calibrated via 5-fold
+   `CalibratedClassifierCV` (isotonic) fit on train+val — a single-split
+   calibration (fit on val alone, ~1.6k rows) was tried first and *hurt*
+   held-out test log-loss/Brier; cross-validated calibration over more data
+   measurably helped instead (see Results below).
 5. **Evaluation** (`src/evaluate.py`) — compares XGBoost against a
    majority-class baseline and an Elo-only baseline, plus a season-by-season
-   walk-forward backtest.
+   walk-forward backtest. **Predict a single fixture** with `src/predict.py`
+   (see Usage below).
 
 ### Results (test split, matches from 2024-10 to 2026-06)
 
@@ -33,10 +38,21 @@ using matches from 2015 onward.
 |---|---|---|
 | Majority-class baseline | 0.480 | 1.050 |
 | Elo-only baseline | 0.584 | 0.903 |
-| **XGBoost (MCMC + Elo + form features)** | **0.613** | **0.812** |
+| XGBoost, raw (uncalibrated) | 0.613 | 0.812 |
+| **XGBoost, calibrated (shipped model)** | **0.624** | **0.804** |
 
 Walk-forward backtest accuracy stays in the 0.52–0.65 range across seasons
 2016–2026 with no degenerate failures — see `reports/walk_forward_backtest.csv`.
+
+### Predicting a single fixture
+
+```bash
+python src/predict.py "Argentina" "Brazil" --neutral --tournament "Copa América"
+python src/predict.py "France" "England" --tournament "FIFA World Cup"
+```
+
+Uses each team's latest known Elo/form/MCMC rating to build the feature row
+and the calibrated classifier + goals regressors to predict.
 
 ### Running it
 

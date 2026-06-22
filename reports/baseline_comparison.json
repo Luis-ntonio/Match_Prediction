@@ -1,8 +1,13 @@
 {
-  "xgboost_test": {
+  "xgboost_raw_test": {
     "accuracy": 0.6134401972872996,
     "log_loss": 0.8124788999557495,
     "brier_score": 0.15865018963813782
+  },
+  "xgboost_calibrated_test": {
+    "accuracy": 0.623921085080148,
+    "log_loss": 0.8041916131640955,
+    "brier_score": 0.15757203340526474
   },
   "majority_class_baseline_test": {
     "accuracy": 0.4802712700369914,

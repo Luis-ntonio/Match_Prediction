@@ -47,15 +47,24 @@
     "tournament_tier"
   ],
   "outcome_metrics": {
-    "val": {
-      "accuracy": 0.6208384710234278,
-      "log_loss": 0.8250131607055664,
-      "brier_score": 0.16116717954476675
+    "raw": {
+      "val": {
+        "accuracy": 0.6208384710234278,
+        "log_loss": 0.8250131607055664,
+        "brier_score": 0.16116717954476675
+      },
+      "test": {
+        "accuracy": 0.6134401972872996,
+        "log_loss": 0.8124788999557495,
+        "brier_score": 0.15865018963813782
+      }
     },
-    "test": {
-      "accuracy": 0.6134401972872996,
-      "log_loss": 0.8124788999557495,
-      "brier_score": 0.15865018963813782
+    "calibrated": {
+      "test": {
+        "accuracy": 0.623921085080148,
+        "log_loss": 0.8041916131640955,
+        "brier_score": 0.15757203340526474
+      }
     }
   },
   "home_goals_metrics": {

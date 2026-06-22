@@ -111,12 +111,13 @@ def main():
 
     train, val, test = temporal_split(df)
 
-    clf, result_encoder, encoders, xgb_metrics = train_outcome_classifier(train, val, test)
+    clf, calibrated_clf, result_encoder, encoders, xgb_metrics = train_outcome_classifier(train, val, test)
     maj_metrics = baseline_majority_class(train, test)
     elo_metrics = baseline_elo_logistic(train, val, test)
 
     comparison = {
-        "xgboost_test": xgb_metrics["test"],
+        "xgboost_raw_test": xgb_metrics["raw"]["test"],
+        "xgboost_calibrated_test": xgb_metrics["calibrated"]["test"],
         "majority_class_baseline_test": maj_metrics,
         "elo_only_baseline_test": elo_metrics,
     }
